@@ -17,7 +17,8 @@ export default {
             image_url: null,
             preview_url: null,
             is_forwarded: false,
-            duration: 0
+            duration: 0,
+            mention_everyone: false
         }
     },
     computed: {
@@ -44,6 +45,9 @@ export default {
         },
         isShowAttributes() {
             return this.type !== window.TYPESTATUS;
+        },
+        isGroup() {
+            return this.type === window.TYPEGROUP;
         },
         isValidForm() {
             if (this.type !== window.TYPESTATUS && !this.phone.trim()) {
@@ -81,7 +85,7 @@ export default {
                 if (this.duration && this.duration > 0) {
                     payload.append("duration", this.duration)
                 }
-                
+
                 const fileInput = $("#file_image");
                 if (fileInput.length > 0 && fileInput[0].files.length > 0) {
                     const file = fileInput[0].files[0];
@@ -90,7 +94,12 @@ export default {
                 if (this.image_url) {
                     payload.append('image_url', this.image_url)
                 }
-                
+
+                // Add mentions if mention_everyone is checked (only for groups)
+                if (this.mention_everyone && this.type === window.TYPEGROUP) {
+                    payload.append("mentions[]", "@everyone");
+                }
+
                 let response = await window.http.post(`/send/image`, payload)
                 this.handleReset();
                 return response.data.message;
@@ -113,6 +122,7 @@ export default {
             this.image_url = null;
             this.is_forwarded = false;
             this.duration = 0;
+            this.mention_everyone = false;
             $("#file_image").val('');
         },
         handleImageChange(event) {
@@ -177,6 +187,13 @@ export default {
                     <div class="ui toggle checkbox">
                         <input type="checkbox" aria-label="is forwarded" v-model="is_forwarded">
                         <label>Mark image as forwarded</label>
+                    </div>
+                </div>
+                <div class="field" v-if="isGroup()">
+                    <label>Mention Everyone</label>
+                    <div class="ui toggle checkbox">
+                        <input type="checkbox" aria-label="mention everyone" v-model="mention_everyone">
+                        <label>Mention all group participants (@everyone)</label>
                     </div>
                 </div>
                 <div class="field">

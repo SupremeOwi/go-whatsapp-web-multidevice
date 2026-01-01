@@ -310,6 +310,17 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 		return response, pkgError.InternalServerError(fmt.Sprintf("failed to read thumbnail %v", err))
 	}
 
+	// Get mentions from caption text (existing behavior - parses @phone from caption)
+	parsedMentions := service.getMentionFromText(ctx, dataWaCaption)
+
+	// Add explicit mentions from request.Mentions (ghost mentions - no @ required in text)
+	if len(request.Mentions) > 0 {
+		explicitMentions := service.getMentionsFromList(ctx, request.Mentions, dataWaRecipient)
+		parsedMentions = append(parsedMentions, explicitMentions...)
+		// Deduplicate to avoid mentioning the same person twice
+		parsedMentions = utils.UniqueStrings(parsedMentions)
+	}
+
 	msg := &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
 		JPEGThumbnail: dataWaThumbnail,
 		Caption:       proto.String(dataWaCaption),
@@ -336,6 +347,14 @@ func (service serviceSend) SendImage(ctx context.Context, request domainSend.Ima
 			msg.ImageMessage.ContextInfo = &waE2E.ContextInfo{}
 		}
 		msg.ImageMessage.ContextInfo.Expiration = proto.Uint32(uint32(*request.BaseRequest.Duration))
+	}
+
+	// Apply mentions to ImageMessage ContextInfo
+	if len(parsedMentions) > 0 {
+		if msg.ImageMessage.ContextInfo == nil {
+			msg.ImageMessage.ContextInfo = &waE2E.ContextInfo{}
+		}
+		msg.ImageMessage.ContextInfo.MentionedJID = parsedMentions
 	}
 
 	caption := "🖼️ Image"
